@@ -11,17 +11,18 @@ import (
   "sync"
 )
 
-var ApiKey string =  ""  
-var Endpoint string = "https://airbreak.io/notifier_api/v2/notices.xml"
-var tmpl = template.Must(template.New("error").Parse(source))
-var Verbose = false
 
 var (
-  badResponse = errors.New("Bad response")
+  ApiKey    =  ""  
+  Endpoint  = "https://airbreak.io/notifier_api/v2/notices.xml"  
+  Verbose   = false
+
+  badResponse   = errors.New("Bad response")
   apiKeyMissing = errors.New("Please set the airbreak.ApiKey before doing calls")
-  dunno     = []byte("???")
-  centerDot = []byte("·")
-  dot       = []byte(".")
+  dunno         = []byte("???")
+  centerDot     = []byte("·")
+  dot           = []byte(".")
+  tmpl          = template.Must(template.New("error").Parse(source))
 )
 
 type Line struct { 
