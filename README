@@ -1,0 +1,9 @@
+= Config
+
+  set airbreak.Endpoint and airbreak.ApiKey globals
+
+= Methods
+
+  airbit.Error(err) reports an error to airbit
+
+  airbit.RequestError(err, *http.Request) can be used to add more context if you are in a http context
