@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+  "reflect"
 	"sync"
 	"text/template"
 )
@@ -39,7 +40,11 @@ func stacktrace(skip int) (lines []Line) {
 		}
 
 		item := Line{string(function(pc)), string(file), line}
-		lines = append(lines, item)
+
+		// ignore panic method
+		if item.Function != "panic" {
+			lines = append(lines, item)
+		}
 	}
 	return
 }
@@ -69,36 +74,36 @@ func function(pc uintptr) []byte {
 
 func initChannel() {
 	channel = make(chan map[string]interface{}, 100)
-	go worker()
+
+	go func() {
+		for params := range channel {
+			buffer := bytes.NewBufferString("")
+
+			if err := tmpl.Execute(buffer, params); err != nil {
+				log.Printf("Airbreak error: %s", err)
+				continue
+			}
+
+			if Verbose {
+				log.Printf("Airbreak payload for endpoint %s: %s", Endpoint, buffer)
+			}
+
+			response, err := http.Post(Endpoint, "text/xml", buffer)
+			response.Body.Close()
+
+			if err != nil {
+				log.Printf("Airbreak error: %s", err)
+				continue
+			}
+
+			if Verbose {
+				log.Printf("Airbreak post: %s status code: %d", params["Error"], response.StatusCode)
+			}
+		}
+	}()
 }
 
-func worker() {
-	for params := range channel {
-		buffer := bytes.NewBufferString("")
-
-		if err := tmpl.Execute(buffer, params); err != nil {
-			log.Printf("Airbreak error: %s", err)
-			continue
-		}
-
-		response, err := http.Post(Endpoint, "text/xml", buffer)
-		response.Body.Close()
-
-		if err != nil {
-			log.Printf("Airbreak error: %s", err)
-			continue
-		}
-
-		if Verbose {
-			log.Printf("Airbreak post: %s", params["Error"])
-		}
-
-	}
-
-	return
-}
-
-func ErrorRequest(e error, request *http.Request) error {
+func Error(e error, request *http.Request) error {
 	once.Do(initChannel)
 
 	if ApiKey == "" {
@@ -106,11 +111,16 @@ func ErrorRequest(e error, request *http.Request) error {
 	}
 
 	params := map[string]interface{}{
+    "Class":     reflect.TypeOf(e).String(),
 		"Error":     e,
 		"ApiKey":    ApiKey,
 		"ErrorName": e.Error(),
 		"Request":   request,
 	}
+
+  if params["Class"] == "" {
+    params["Class"] = "Panic"
+  }
 
 	pwd, err := os.Getwd()
 	if err == nil {
@@ -123,12 +133,22 @@ func ErrorRequest(e error, request *http.Request) error {
 	return nil
 }
 
-func Error(e error) error {
-	return ErrorRequest(e, nil)
+func CapturePanic(r *http.Request) {
+	if rec := recover(); rec != nil {
+
+		if err, ok := rec.(error); ok {
+			log.Printf("Recording err %s", err)
+			Error(err, r)
+		} else if err, ok := rec.(string); ok {
+			log.Printf("Recording string %s", err)
+			Error(errors.New(err), r)
+		}
+
+		panic(rec)
+	}
 }
 
-const source = `
-<?xml version="1.0" encoding="UTF-8"?>
+const source = `<?xml version="1.0" encoding="UTF-8"?>
 <notice version="2.0">
   <api-key>{{ .ApiKey }}</api-key>
   <notifier>
@@ -137,8 +157,8 @@ const source = `
     <url>http://airbrake.io</url>
   </notifier>
   <error>
-    <class>{{ html .ErrorName }}</class>
-    <message>test{{ with .ErrorMessage }}{{html .}}{{ end }}</message>
+    <class>{{ html .Class }}</class>
+    <message>{{ with .ErrorName }}{{html .}}{{ end }}</message>
     <backtrace>
       {{ range .Backtrace }}
       <line method="{{.Function}}" file="{{.File}}" number="{{.Line}}"/>
@@ -150,8 +170,6 @@ const source = `
     <url>{{ .URL }}</url>
     <component/>
     <action/>
-    <cgi-data>
-    </cgi-data>
   </request>
   {{ end }}  
   <server-environment>
