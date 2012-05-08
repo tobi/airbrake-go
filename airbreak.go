@@ -10,7 +10,7 @@ import (
   "net/http"
 )
 
-var ApiKey string =  "bfbc15348c62934c22e221315a355f00"  
+var ApiKey string =  ""  
 var Endpoint string = "https://airbreak.io/notifier_api/v2/notices.xml"
 
 const source = `<?xml version="1.0" encoding="UTF-8"?>
@@ -50,6 +50,7 @@ var tmpl = template.Must(template.New("error").Parse(source))
 
 var (
   badResponse = errors.New("Bad response")
+  apiKeyMissing = errors.New("Please set the airbreak.ApiKey before doing calls")
   dunno     = []byte("???")
   centerDot = []byte("·")
   dot       = []byte(".")
@@ -101,6 +102,10 @@ func function(pc uintptr) []byte {
 }
 
 func ErrorRequest(e error, request *http.Request) error {
+  if ApiKey == "" {
+    return apiKeyMissing
+  }
+
   params := map[string]interface{} { 
     "Error": e, 
     "ApiKey": ApiKey, 
