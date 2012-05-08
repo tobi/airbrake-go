@@ -1,4 +1,4 @@
-package airbreak
+package airbrake
 
 import (
   "bytes"
@@ -14,11 +14,11 @@ import (
 
 var (
   ApiKey    =  ""  
-  Endpoint  = "https://airbreak.io/notifier_api/v2/notices.xml"  
+  Endpoint  = "https://airbrake.io/notifier_api/v2/notices.xml"  
   Verbose   = false
 
   badResponse   = errors.New("Bad response")
-  apiKeyMissing = errors.New("Please set the airbreak.ApiKey before doing calls")
+  apiKeyMissing = errors.New("Please set the airbrake.ApiKey before doing calls")
   dunno         = []byte("???")
   centerDot     = []byte("·")
   dot           = []byte(".")
@@ -40,7 +40,7 @@ func stacktrace(skip int) (lines []Line) {
     }
 
     item := Line{ string(function(pc)), string(file), line}
-    lines = append(lines, item )
+    lines = append(lines, item)
   }
   return
 }

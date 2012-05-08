@@ -1,9 +1,11 @@
-= Config
+Config
+======
 
-  set airbreak.Endpoint and airbreak.ApiKey globals
+set airbrake.Endpoint and airbrake.ApiKey globals
 
-= Methods
+Methods
+=======
 
-  airbit.Error(err) reports an error to airbit
+airbrake.Error(err) reports an error
 
-  airbit.RequestError(err, *http.Request) can be used to add more context if you are in a http context
+airbrake.RequestError(err, *http.Request) can be used to add more context if you are in a http context

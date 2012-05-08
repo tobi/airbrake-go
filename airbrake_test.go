@@ -1,9 +1,8 @@
-package airbreak
+package airbrake
 
 import (
   "errors"
   "testing"
-//  "testing/quick"
   "net/http"
   "bytes"
   "time"
