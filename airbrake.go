@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"sync"
 	"text/template"
+	"io/ioutil"
 )
 
 var (
@@ -89,6 +90,11 @@ func initChannel() {
 			}
 
 			response, err := http.Post(Endpoint, "text/xml", buffer)
+
+			if Verbose {
+				body, _ := ioutil.ReadAll(response.Body)
+				log.Printf("response: %s", body)
+			}
 			response.Body.Close()
 
 			if err != nil {
@@ -161,19 +167,19 @@ const source = `<?xml version="1.0" encoding="UTF-8"?>
     <message>{{ with .ErrorName }}{{html .}}{{ end }}</message>
     <backtrace>
       {{ range .Backtrace }}
-      <line method="{{.Function}}" file="{{.File}}" number="{{.Line}}"/>
+      <line method="{{ html .Function}}" file="{{ html .File}}" number="{{.Line}}"/>
       {{ end }}
     </backtrace>
   </error>
   {{ with .Request }}
   <request>
-    <url>{{ .URL }}</url>
+    <url>{{ html .URL }}</url>
     <component/>
     <action/>
   </request>
   {{ end }}  
   <server-environment>
     <environment-name>production</environment-name>
-    <project-root>{{ .Pwd }}</project-root>        
+    <project-root>{{ html .Pwd }}</project-root>        
   </server-environment>
 </notice>`
