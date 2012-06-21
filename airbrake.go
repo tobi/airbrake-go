@@ -6,8 +6,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"reflect"
 	"runtime"
-  "reflect"
 	"sync"
 	"text/template"
 )
@@ -111,16 +111,16 @@ func Error(e error, request *http.Request) error {
 	}
 
 	params := map[string]interface{}{
-    "Class":     reflect.TypeOf(e).String(),
+		"Class":     reflect.TypeOf(e).String(),
 		"Error":     e,
 		"ApiKey":    ApiKey,
 		"ErrorName": e.Error(),
 		"Request":   request,
 	}
 
-  if params["Class"] == "" {
-    params["Class"] = "Panic"
-  }
+	if params["Class"] == "" {
+		params["Class"] = "Panic"
+	}
 
 	pwd, err := os.Getwd()
 	if err == nil {
