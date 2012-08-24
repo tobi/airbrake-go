@@ -3,6 +3,7 @@ package airbrake
 import (
 	"bytes"
 	"errors"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -10,7 +11,6 @@ import (
 	"runtime"
 	"sync"
 	"text/template"
-	"io/ioutil"
 )
 
 var (
@@ -78,35 +78,40 @@ func initChannel() {
 
 	go func() {
 		for params := range channel {
-			buffer := bytes.NewBufferString("")
-
-			if err := tmpl.Execute(buffer, params); err != nil {
-				log.Printf("Airbreak error: %s", err)
-				continue
-			}
-
-			if Verbose {
-				log.Printf("Airbreak payload for endpoint %s: %s", Endpoint, buffer)
-			}
-
-			response, err := http.Post(Endpoint, "text/xml", buffer)
-
-			if Verbose {
-				body, _ := ioutil.ReadAll(response.Body)
-				log.Printf("response: %s", body)
-			}
-			response.Body.Close()
-
-			if err != nil {
-				log.Printf("Airbreak error: %s", err)
-				continue
-			}
-
-			if Verbose {
-				log.Printf("Airbreak post: %s status code: %d", params["Error"], response.StatusCode)
-			}
+			post(params)
 		}
 	}()
+}
+
+func post(params map[string]interface{}) {
+	buffer := bytes.NewBufferString("")
+
+	if err := tmpl.Execute(buffer, params); err != nil {
+		log.Printf("Airbreak error: %s", err)
+		return
+	}
+
+	if Verbose {
+		log.Printf("Airbreak payload for endpoint %s: %s", Endpoint, buffer)
+	}
+
+	response, err := http.Post(Endpoint, "text/xml", buffer)
+
+	if Verbose {
+		body, _ := ioutil.ReadAll(response.Body)
+		log.Printf("response: %s", body)
+	}
+	response.Body.Close()
+
+	if err != nil {
+		log.Printf("Airbreak error: %s", err)
+		return
+	}
+
+	if Verbose {
+		log.Printf("Airbreak post: %s status code: %d", params["Error"], response.StatusCode)
+	}
+
 }
 
 func Error(e error, request *http.Request) error {
@@ -135,7 +140,8 @@ func Error(e error, request *http.Request) error {
 
 	params["Backtrace"] = stacktrace(3)
 
-	channel <- params
+	post(params)
+
 	return nil
 }
 

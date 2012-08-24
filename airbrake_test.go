@@ -13,7 +13,7 @@ func TestError(t *testing.T) {
 	ApiKey = ""
 	Endpoint = "https://exceptions.shopify.com/notifier_api/v2/notices.xml"
 
-	err := Error(errors.New("GenericFailure"))
+	err := Error(errors.New("GenericFailure"), nil)
 	if err != nil {
 
 		t.Error(err)
@@ -29,7 +29,7 @@ func TestRequest(t *testing.T) {
 
 	request, _ := http.NewRequest("GET", "/some/path?a=1", bytes.NewBufferString(""))
 
-	err := ErrorRequest(errors.New("GenericFailure"), request)
+	err := Error(errors.New("GenericFailure"), request)
 
 	if err != nil {
 		t.Error(err)
