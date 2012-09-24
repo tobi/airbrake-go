@@ -185,7 +185,7 @@ const source = `<?xml version="1.0" encoding="UTF-8"?>
   </request>
   {{ end }}  
   <server-environment>
-    <environment-name>production</environment-name>
-    <project-root>{{ html .Pwd }}</project-root>        
+  <project-root>{{ html .Pwd }}</project-root>
+  <environment-name>production</environment-name>
   </server-environment>
 </notice>`
