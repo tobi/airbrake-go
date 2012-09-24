@@ -15,7 +15,7 @@ import (
 
 var (
 	ApiKey   = ""
-	Endpoint = "https://airbrake.io/notifier_api/v2/notices.xml"
+	Endpoint = "https://airbrake.io/notifier_api/v2/notices"
 	Verbose  = false
 
 	badResponse   = errors.New("Bad response")
