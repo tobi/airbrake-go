@@ -13,7 +13,7 @@ import (
 	"text/template"
 )
 
-var (
+aivar (
 	ApiKey   = ""
 	Endpoint = "https://api.airbrake.io/notifier_api/v2/notices"
 	Verbose  = false
