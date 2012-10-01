@@ -8,9 +8,11 @@ import (
 	"time"
 )
 
+const API_KEY = ""
+
 func TestError(t *testing.T) {
 	Verbose = true
-	ApiKey = ""
+	ApiKey = API_KEY
 	Endpoint = "https://api.airbrake.io/notifier_api/v2/notices"
 
 	err := Error(errors.New("Test Error"), nil)
@@ -24,7 +26,7 @@ func TestError(t *testing.T) {
 
 func TestRequest(t *testing.T) {
 	Verbose = true
-	ApiKey = ""
+	ApiKey = API_KEY
 	Endpoint = "https://api.airbrake.io/notifier_api/v2/notices"
 
 	request, _ := http.NewRequest("GET", "/some/path?a=1", bytes.NewBufferString(""))
@@ -40,10 +42,10 @@ func TestRequest(t *testing.T) {
 
 func TestNotify(t *testing.T) {
 	Verbose = true
-	ApiKey = ""
+	ApiKey = API_KEY
 	Endpoint = "https://api.airbrake.io/notifier_api/v2/notices"
 	
-	err := Notify(errors.New("Test Error")
+	err := Notify(errors.New("Test Error"))
 	
 	if err != nil {
 		t.Error(err)

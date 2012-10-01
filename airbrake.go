@@ -13,7 +13,7 @@ import (
 	"text/template"
 )
 
-aivar (
+var (
 	ApiKey   = ""
 	Endpoint = "https://api.airbrake.io/notifier_api/v2/notices"
 	Verbose  = false
@@ -140,19 +140,19 @@ func Error(e error, request *http.Request) error {
 
 	params["Backtrace"] = stacktrace(3)
 
-	post(params)
+    post(params)
 
-	return nil
+    return nil
 }
 
 func Notify(e error) error {
-	once.Do(initChannel)
-	
-	if ApiKey == "" {
-		return apiKeyMissing
-	}
-	
-	params := map[string]interface{}{
+    once.Do(initChannel)
+    
+    if ApiKey == "" {
+        return apiKeyMissing
+    }
+    
+    params := map[string]interface{}{
                 "Class":     reflect.TypeOf(e).String(),
                 "Error":     e,
                 "ApiKey":    ApiKey,
@@ -163,36 +163,36 @@ func Notify(e error) error {
             params["Class"] = "Panic"
         }
         
-	pwd, err := os.Getwd()
+    pwd, err := os.Getwd()
         
-	if err == nil {
+    if err == nil {
             params["Pwd"] = pwd                                             
         }
-	
-	hostname, err := os.Hostname()
+    
+    hostname, err := os.Hostname()
 
-	if err == nil {
+    if err == nil {
             params["Hostname"] = hostname
-	}
+    }
 
         post(params)
         return nil  
-	
+    
 }
 
 func CapturePanic(r *http.Request) {
-	if rec := recover(); rec != nil {
+    if rec := recover(); rec != nil {
 
-		if err, ok := rec.(error); ok {
-			log.Printf("Recording err %s", err)
-			Error(err, r)
-		} else if err, ok := rec.(string); ok {
-			log.Printf("Recording string %s", err)
-			Error(errors.New(err), r)
-		}
+        if err, ok := rec.(error); ok {
+            log.Printf("Recording err %s", err)
+            Error(err, r)
+        } else if err, ok := rec.(string); ok {
+            log.Printf("Recording string %s", err)
+            Error(errors.New(err), r)
+        }
 
-		panic(rec)
-	}
+        panic(rec)
+    }
 }
 
 const source = `<?xml version="1.0" encoding="UTF-8"?>
