@@ -4,10 +4,10 @@ import (
 	"net/http"
 )
 
-// CapturePanicHandler "middleware". 
+// CapturePanicHandler "middleware".
 // Wraps the http handler so that all panics will be dutifully reported to airbreak
-// 
-// Example: 
+//
+// Example:
 //   http.HandleFunc("/", airbrake.CapturePanicHandler(MyServerFunc))
 func CapturePanicHandler(app http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

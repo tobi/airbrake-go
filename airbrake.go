@@ -1,3 +1,4 @@
+// Package airbrake sends errors and panics to http://airbrake.io and compatible services.
 package airbrake
 
 import (
@@ -20,8 +21,8 @@ var (
 	ProjectRoot = ""
 	Environment = "development"
 	Version     = ""
-	Endpoint    = "https://api.airbrake.io/notifier_api/v2/notices"
-	Verbose     = false
+	Endpoint    = "https://api.airbrake.io/notifier_api/v2/notices" // not all plans support HTTPS!
+	Verbose     = false                                             // uses log.Print if set to true
 
 	badResponse   = errors.New("Bad response")
 	apiKeyMissing = errors.New("Please set the airbrake.ApiKey before doing calls")
@@ -130,6 +131,7 @@ func makeParams(e error) (params map[string]interface{}) {
 	return
 }
 
+// Send error with request information and backtrace.
 func Error(e error, request *http.Request) error {
 	if ApiKey == "" {
 		return apiKeyMissing
@@ -143,6 +145,7 @@ func Error(e error, request *http.Request) error {
 	return nil
 }
 
+// Notify about error (without backtrace).
 func Notify(e error) error {
 	if ApiKey == "" {
 		return apiKeyMissing

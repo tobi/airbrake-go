@@ -20,9 +20,9 @@ example:
 
   func serve(w http.ResponseWriter, r *http.Request) {
       defer airbrake.CapturePanic(r)
-      
+
       [...]
 
-      panic("Oh no :-(") // will be recorded by airbrake 
+      panic("Oh no :-(") // will be recorded by airbrake
 
   }
