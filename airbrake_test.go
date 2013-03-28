@@ -2,7 +2,6 @@ package airbrake_test
 
 import (
 	. "."
-	"bytes"
 	"errors"
 	"net/http"
 	"os"
@@ -35,9 +34,9 @@ func TestError(t *testing.T) {
 }
 
 func TestRequest(t *testing.T) {
-	request, _ := http.NewRequest("GET", "/some/path?a=1", bytes.NewBufferString(""))
+	request, _ := http.NewRequest("GET", "/some/path?a=1", nil)
 
-	err := Error(errors.New("Test Error"), request)
+	err := Error(errors.New("Test Request"), request)
 	if err != nil {
 		t.Error(err)
 	}
@@ -52,4 +51,14 @@ func TestNotify(t *testing.T) {
 	}
 
 	time.Sleep(time.Second)
+}
+
+func TestCapturePanic(t *testing.T) {
+	defer time.Sleep(time.Second)
+	defer func() {
+		t.Logf("DON'T PANIC! %v", recover())
+	}()
+
+	defer CapturePanic(nil)
+	panic(42)
 }

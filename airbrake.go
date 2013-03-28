@@ -3,6 +3,7 @@ package airbrake
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -176,13 +177,13 @@ func Notify(e error) error {
 func CapturePanic(r *http.Request) {
 	if rec := recover(); rec != nil {
 
-		if err, ok := rec.(error); ok {
-			log.Printf("Recording err %s", err)
-			Error(err, r)
-		} else if err, ok := rec.(string); ok {
-			log.Printf("Recording string %s", err)
-			Error(errors.New(err), r)
+		err, ok := rec.(error)
+		if !ok {
+			err = fmt.Errorf("%v", rec)
 		}
+
+		log.Printf("Recording error %s %T", err, rec)
+		Error(err, r)
 
 		panic(rec)
 	}
