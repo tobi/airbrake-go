@@ -44,9 +44,9 @@ func TestNotify(t *testing.T) {
 	Verbose = true
 	ApiKey = API_KEY
 	Endpoint = "https://api.airbrake.io/notifier_api/v2/notices"
-	
+
 	err := Notify(errors.New("Test Error"))
-	
+
 	if err != nil {
 		t.Error(err)
 	}
