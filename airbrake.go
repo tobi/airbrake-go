@@ -154,7 +154,6 @@ func Notify(e error) error {
 
 func CapturePanic(r *http.Request) {
 	if rec := recover(); rec != nil {
-
 		err, ok := rec.(error)
 		if !ok {
 			err = fmt.Errorf("%v", rec)
@@ -179,9 +178,9 @@ const source = `<?xml version="1.0" encoding="UTF-8"?>
 
   <error>
     <class>{{ html .Class }}</class>
-    <message>{{ with .ErrorName }}{{html .}}{{ end }}</message>
+    <message>{{ html .ErrorName }}</message>
     <backtrace>{{ range .Backtrace }}
-      <line method="{{ html .Function}}" file="{{ html .File}}" number="{{.Line}}"/>{{ end }}
+      <line method="{{ html .Function }}" file="{{ html .File }}" number="{{ .Line }}"/>{{ end }}
     </backtrace>
   </error>
   {{ with .Request }}
