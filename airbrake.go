@@ -19,6 +19,7 @@ var (
 	Hostname    = ""
 	ProjectRoot = ""
 	Environment = "development"
+	Version     = ""
 	Endpoint    = "https://api.airbrake.io/notifier_api/v2/notices"
 	Verbose     = false
 
@@ -124,6 +125,7 @@ func makeParams(e error) (params map[string]interface{}) {
 	params["Hostname"] = Hostname
 	params["ProjectRoot"] = ProjectRoot
 	params["Environment"] = Environment
+	params["Version"] = Version
 
 	return
 }
@@ -193,6 +195,7 @@ const source = `<?xml version="1.0" encoding="UTF-8"?>
   <server-environment>
     <project-root>{{ html .ProjectRoot }}</project-root>
     <environment-name>{{ html .Environment }}</environment-name>
+    <app-version>{{ html .Version }}</app-version>
     <hostname>{{ html .Hostname }}</hostname>
   </server-environment>
 </notice>`
