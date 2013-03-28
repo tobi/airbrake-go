@@ -9,6 +9,12 @@ import (
 	"time"
 )
 
+type S struct{}
+
+func (s *S) f() {
+	panic(42)
+}
+
 func init() {
 	ApiKey = os.Getenv("AIRBRAKE_TEST_KEY")
 	if ApiKey == "" {
@@ -60,5 +66,5 @@ func TestCapturePanic(t *testing.T) {
 	}()
 
 	defer CapturePanic(nil)
-	panic(42)
+	new(S).f()
 }

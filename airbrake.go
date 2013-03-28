@@ -64,23 +64,23 @@ func backtrace(skip int) (lines []Line) {
 }
 
 // function returns, if possible, the name of the function containing the PC.
-func function(pc uintptr) string {
+func function(pc uintptr) (name string) {
 	fn := runtime.FuncForPC(pc)
 	if fn == nil {
 		return "???"
 	}
-	name := fn.Name()
-	// The name includes the path name to the package, which is unnecessary
-	// since the file name is already included.  Plus, can has center dots.
-	// That is, we see
-	//  runtime/debug.*T·ptrmethod
-	// and want
-	//  *T.ptrmethod
-	if period := strings.Index(name, "."); period >= 0 {
+
+	name = fn.Name()
+
+	// Remove import path from name: reduce
+	// "github.com/tobi/airbrake-go_test.(*S).f" to "airbrake-go_test.(*S).f"
+	if period := strings.LastIndex(name, "/"); period >= 0 {
 		name = name[period+1:]
 	}
+
+	// center dot is used in internals instead of dot
 	name = strings.Replace(name, "·", ".", -1)
-	return name
+	return
 }
 
 func post(params map[string]interface{}) {
