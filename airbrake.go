@@ -10,6 +10,7 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"strings"
 	"text/template"
 )
 
@@ -23,9 +24,6 @@ var (
 
 	badResponse   = errors.New("Bad response")
 	apiKeyMissing = errors.New("Please set the airbrake.ApiKey before doing calls")
-	dunno         = []byte("???")
-	centerDot     = []byte("·")
-	dot           = []byte(".")
 	tmpl          = template.Must(template.New("error").Parse(source))
 )
 
@@ -55,7 +53,7 @@ func backtrace(skip int) (lines []Line) {
 			break
 		}
 
-		item := Line{string(function(pc)), string(file), line}
+		item := Line{function(pc), string(file), line}
 
 		// ignore panic method
 		if item.Function != "panic" {
@@ -66,22 +64,22 @@ func backtrace(skip int) (lines []Line) {
 }
 
 // function returns, if possible, the name of the function containing the PC.
-func function(pc uintptr) []byte {
+func function(pc uintptr) string {
 	fn := runtime.FuncForPC(pc)
 	if fn == nil {
-		return dunno
+		return "???"
 	}
-	name := []byte(fn.Name())
+	name := fn.Name()
 	// The name includes the path name to the package, which is unnecessary
-	// since the file name is already included.  Plus, it has center dots.
+	// since the file name is already included.  Plus, can has center dots.
 	// That is, we see
 	//  runtime/debug.*T·ptrmethod
 	// and want
 	//  *T.ptrmethod
-	if period := bytes.Index(name, dot); period >= 0 {
+	if period := strings.Index(name, "."); period >= 0 {
 		name = name[period+1:]
 	}
-	name = bytes.Replace(name, centerDot, dot, -1)
+	name = strings.Replace(name, "·", ".", -1)
 	return name
 }
 
