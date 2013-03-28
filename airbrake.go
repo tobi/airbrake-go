@@ -1,46 +1,61 @@
+// Package airbrake sends errors and panics to http://airbrake.io and compatible services.
 package airbrake
 
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"reflect"
 	"runtime"
-	"sync"
+	"strings"
 	"text/template"
 )
 
 var (
-	ApiKey   = ""
-	Endpoint = "https://api.airbrake.io/notifier_api/v2/notices"
-	Verbose  = false
+	ApiKey      = ""
+	Hostname    = ""
+	ProjectRoot = ""
+	Environment = "development"
+	Version     = ""
+	Endpoint    = "https://api.airbrake.io/notifier_api/v2/notices" // not all plans support HTTPS!
+	Verbose     = false                                             // uses log.Print if set to true
 
 	badResponse   = errors.New("Bad response")
 	apiKeyMissing = errors.New("Please set the airbrake.ApiKey before doing calls")
-	dunno         = []byte("???")
-	centerDot     = []byte("·")
-	dot           = []byte(".")
 	tmpl          = template.Must(template.New("error").Parse(source))
 )
 
-type Line struct {
+func init() {
+	hostname, err := os.Hostname()
+	if err == nil {
+		Hostname = hostname
+	}
+
+	pwd, err := os.Getwd()
+	if err == nil {
+		ProjectRoot = pwd
+	}
+}
+
+type line struct {
 	Function string
 	File     string
 	Line     int
 }
 
-// stack implements Stack, skipping N frames
-func stacktrace(skip int) (lines []Line) {
+// return backtrace, skipping some lines
+func backtrace(skip int) (lines []line) {
 	for i := skip; ; i++ {
-		pc, file, line, ok := runtime.Caller(i)
+		pc, file, l, ok := runtime.Caller(i)
 		if !ok {
 			break
 		}
 
-		item := Line{string(function(pc)), string(file), line}
+		item := line{function(pc), string(file), l}
 
 		// ignore panic method
 		if item.Function != "panic" {
@@ -50,41 +65,28 @@ func stacktrace(skip int) (lines []Line) {
 	return
 }
 
-var channel chan map[string]interface{}
-var once sync.Once
-
 // function returns, if possible, the name of the function containing the PC.
-func function(pc uintptr) []byte {
+func function(pc uintptr) (name string) {
 	fn := runtime.FuncForPC(pc)
 	if fn == nil {
-		return dunno
+		return "???"
 	}
-	name := []byte(fn.Name())
-	// The name includes the path name to the package, which is unnecessary
-	// since the file name is already included.  Plus, it has center dots.
-	// That is, we see
-	//  runtime/debug.*T·ptrmethod
-	// and want
-	//  *T.ptrmethod
-	if period := bytes.Index(name, dot); period >= 0 {
+
+	name = fn.Name()
+
+	// Remove import path from name: reduce
+	// "github.com/tobi/airbrake-go_test.(*S).f" to "airbrake-go_test.(*S).f"
+	if period := strings.LastIndex(name, "/"); period >= 0 {
 		name = name[period+1:]
 	}
-	name = bytes.Replace(name, centerDot, dot, -1)
-	return name
-}
 
-func initChannel() {
-	channel = make(chan map[string]interface{}, 100)
-
-	go func() {
-		for params := range channel {
-			post(params)
-		}
-	}()
+	// center dot is used in internals instead of dot
+	name = strings.Replace(name, "·", ".", -1)
+	return
 }
 
 func post(params map[string]interface{}) {
-	buffer := bytes.NewBufferString("")
+	buffer := new(bytes.Buffer)
 
 	if err := tmpl.Execute(buffer, params); err != nil {
 		log.Printf("Airbreak error: %s", err)
@@ -96,120 +98,94 @@ func post(params map[string]interface{}) {
 	}
 
 	response, err := http.Post(Endpoint, "text/xml", buffer)
-
-	if Verbose {
-		body, _ := ioutil.ReadAll(response.Body)
-		log.Printf("response: %s", body)
-	}
-	response.Body.Close()
-
 	if err != nil {
 		log.Printf("Airbreak error: %s", err)
 		return
 	}
+	defer response.Body.Close()
 
-	if Verbose {
-		log.Printf("Airbreak post: %s status code: %d", params["Error"], response.StatusCode)
+	if Verbose || response.StatusCode != http.StatusOK {
+		body, _ := ioutil.ReadAll(response.Body)
+		log.Printf("Airbreak response: %s", body)
+		log.Printf("Airbreak post: %q (%s) status code: %d", params["Error"], params["Class"], response.StatusCode)
 	}
-
 }
 
-func Error(e error, request *http.Request) error {
-	once.Do(initChannel)
-
-	if ApiKey == "" {
-		return apiKeyMissing
-	}
-
-	params := map[string]interface{}{
+func makeParams(e error) (params map[string]interface{}) {
+	params = map[string]interface{}{
 		"Class":     reflect.TypeOf(e).String(),
 		"Error":     e,
 		"ApiKey":    ApiKey,
 		"ErrorName": e.Error(),
-		"Request":   request,
 	}
 
 	if params["Class"] == "" {
 		params["Class"] = "Panic"
 	}
 
-	pwd, err := os.Getwd()
-	if err == nil {
-		params["Pwd"] = pwd
-	}
+	params["Hostname"] = Hostname
+	params["ProjectRoot"] = ProjectRoot
+	params["Environment"] = Environment
+	params["Version"] = Version
 
-	params["Backtrace"] = stacktrace(3)
-
-    post(params)
-
-    return nil
+	return
 }
 
+// Send error with request information and backtrace.
+func Error(e error, request *http.Request) error {
+	if ApiKey == "" {
+		return apiKeyMissing
+	}
+
+	params := makeParams(e)
+	params["Request"] = request
+	params["Backtrace"] = backtrace(2)
+
+	post(params)
+	return nil
+}
+
+// Notify about error (without backtrace).
 func Notify(e error) error {
-    once.Do(initChannel)
-    
-    if ApiKey == "" {
-        return apiKeyMissing
-    }
-    
-    params := map[string]interface{}{
-                "Class":     reflect.TypeOf(e).String(),
-                "Error":     e,
-                "ApiKey":    ApiKey,
-                "ErrorName": e.Error(),
-        }
+	if ApiKey == "" {
+		return apiKeyMissing
+	}
 
-        if params["Class"] == "" {
-            params["Class"] = "Panic"
-        }
-        
-    pwd, err := os.Getwd()
-        
-    if err == nil {
-            params["Pwd"] = pwd                                             
-        }
-    
-    hostname, err := os.Hostname()
+	params := makeParams(e)
 
-    if err == nil {
-            params["Hostname"] = hostname
-    }
-
-        post(params)
-        return nil  
-    
+	post(params)
+	return nil
 }
 
 func CapturePanic(r *http.Request) {
-    if rec := recover(); rec != nil {
+	if rec := recover(); rec != nil {
+		err, ok := rec.(error)
+		if !ok {
+			err = fmt.Errorf("%v", rec)
+		}
 
-        if err, ok := rec.(error); ok {
-            log.Printf("Recording err %s", err)
-            Error(err, r)
-        } else if err, ok := rec.(string); ok {
-            log.Printf("Recording string %s", err)
-            Error(errors.New(err), r)
-        }
+		log.Printf("Recording error %s %T", err, rec)
+		Error(err, r)
 
-        panic(rec)
-    }
+		panic(rec)
+	}
 }
 
+// current schema: http://airbrake.io/airbrake_2_4.xsd
 const source = `<?xml version="1.0" encoding="UTF-8"?>
 <notice version="2.0">
   <api-key>{{ .ApiKey }}</api-key>
   <notifier>
     <name>Airbrake Golang</name>
     <version>0.0.1</version>
-    <url>http://airbrake.io</url>
+    <url>https://github.com/tobi/airbrake-go</url>
   </notifier>
+
   <error>
     <class>{{ html .Class }}</class>
-    <message>{{ with .ErrorName }}{{html .}}{{ end }}</message>
-    <backtrace>
-      {{ range .Backtrace }}
-      <line method="{{ html .Function}}" file="{{ html .File}}" number="{{.Line}}"/>
-      {{ end }}
+    <message>{{ html .ErrorName }}</message>
+    <backtrace>{{ range .Backtrace }}
+      <line method="{{ html .Function }}" file="{{ html .File }}" number="{{ .Line }}"/>{{ end }}
     </backtrace>
   </error>
   {{ with .Request }}
@@ -218,10 +194,11 @@ const source = `<?xml version="1.0" encoding="UTF-8"?>
     <component/>
     <action/>
   </request>
-  {{ end }}  
+  {{ end }}
   <server-environment>
-    <project-root>{{ html .Pwd }}</project-root>   
-    <environment-name>development</environment-name>
+    <project-root>{{ html .ProjectRoot }}</project-root>
+    <environment-name>{{ html .Environment }}</environment-name>
+    <app-version>{{ html .Version }}</app-version>
     <hostname>{{ html .Hostname }}</hostname>
   </server-environment>
 </notice>`
