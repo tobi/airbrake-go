@@ -84,7 +84,7 @@ func function(pc uintptr) (name string) {
 }
 
 func post(params map[string]interface{}) {
-	buffer := bytes.NewBufferString("")
+	buffer := new(bytes.Buffer)
 
 	if err := tmpl.Execute(buffer, params); err != nil {
 		log.Printf("Airbreak error: %s", err)
@@ -96,20 +96,16 @@ func post(params map[string]interface{}) {
 	}
 
 	response, err := http.Post(Endpoint, "text/xml", buffer)
-
-	if Verbose {
-		body, _ := ioutil.ReadAll(response.Body)
-		log.Printf("response: %s", body)
-	}
-	response.Body.Close()
-
 	if err != nil {
 		log.Printf("Airbreak error: %s", err)
 		return
 	}
+	defer response.Body.Close()
 
-	if Verbose {
-		log.Printf("Airbreak post: %s status code: %d", params["Error"], response.StatusCode)
+	if Verbose || response.StatusCode != http.StatusOK {
+		body, _ := ioutil.ReadAll(response.Body)
+		log.Printf("Airbreak response: %s", body)
+		log.Printf("Airbreak post: %q (%s) status code: %d", params["Error"], params["Class"], response.StatusCode)
 	}
 }
 
