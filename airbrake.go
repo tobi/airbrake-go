@@ -10,7 +10,6 @@ import (
 	"os"
 	"reflect"
 	"runtime"
-	"sync"
 	"text/template"
 )
 
@@ -66,9 +65,6 @@ func backtrace(skip int) (lines []Line) {
 	return
 }
 
-var channel chan map[string]interface{}
-var once sync.Once
-
 // function returns, if possible, the name of the function containing the PC.
 func function(pc uintptr) []byte {
 	fn := runtime.FuncForPC(pc)
@@ -87,16 +83,6 @@ func function(pc uintptr) []byte {
 	}
 	name = bytes.Replace(name, centerDot, dot, -1)
 	return name
-}
-
-func initChannel() {
-	channel = make(chan map[string]interface{}, 100)
-
-	go func() {
-		for params := range channel {
-			post(params)
-		}
-	}()
 }
 
 func post(params map[string]interface{}) {
@@ -130,8 +116,6 @@ func post(params map[string]interface{}) {
 }
 
 func makeParams(e error) (params map[string]interface{}) {
-	once.Do(initChannel)
-
 	params = map[string]interface{}{
 		"Class":     reflect.TypeOf(e).String(),
 		"Error":     e,
