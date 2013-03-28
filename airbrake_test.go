@@ -1,55 +1,55 @@
-package airbrake
+package airbrake_test
 
 import (
+	. "."
 	"bytes"
 	"errors"
 	"net/http"
+	"os"
 	"testing"
 	"time"
 )
 
-const API_KEY = ""
+func init() {
+	ApiKey = os.Getenv("AIRBRAKE_TEST_KEY")
+	if ApiKey == "" {
+		panic("Set environment variable AIRBRAKE_TEST_KEY")
+	}
+
+	endpoint := os.Getenv("AIRBRAKE_TEST_ENDPOINT")
+	if endpoint != "" {
+		Endpoint = endpoint
+	}
+
+	Environment = "testing"
+	Verbose = true
+}
 
 func TestError(t *testing.T) {
-	Verbose = true
-	ApiKey = API_KEY
-	Endpoint = "https://api.airbrake.io/notifier_api/v2/notices"
-
 	err := Error(errors.New("Test Error"), nil)
 	if err != nil {
-
 		t.Error(err)
 	}
 
-	time.Sleep(1e9)
+	time.Sleep(time.Second) // to prevent throttling
 }
 
 func TestRequest(t *testing.T) {
-	Verbose = true
-	ApiKey = API_KEY
-	Endpoint = "https://api.airbrake.io/notifier_api/v2/notices"
-
 	request, _ := http.NewRequest("GET", "/some/path?a=1", bytes.NewBufferString(""))
 
 	err := Error(errors.New("Test Error"), request)
-
 	if err != nil {
 		t.Error(err)
 	}
 
-	time.Sleep(1e9)
+	time.Sleep(time.Second)
 }
 
 func TestNotify(t *testing.T) {
-	Verbose = true
-	ApiKey = API_KEY
-	Endpoint = "https://api.airbrake.io/notifier_api/v2/notices"
-
-	err := Notify(errors.New("Test Error"))
-
+	err := Notify(errors.New("Test Notify"))
 	if err != nil {
 		t.Error(err)
 	}
 
-	time.Sleep(1e9)
+	time.Sleep(time.Second)
 }
