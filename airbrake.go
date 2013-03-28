@@ -114,45 +114,10 @@ func post(params map[string]interface{}) {
 
 }
 
-func Error(e error, request *http.Request) error {
+func makeParams(e error) (params map[string]interface{}) {
 	once.Do(initChannel)
 
-	if ApiKey == "" {
-		return apiKeyMissing
-	}
-
-	params := map[string]interface{}{
-		"Class":     reflect.TypeOf(e).String(),
-		"Error":     e,
-		"ApiKey":    ApiKey,
-		"ErrorName": e.Error(),
-		"Request":   request,
-	}
-
-	if params["Class"] == "" {
-		params["Class"] = "Panic"
-	}
-
-	pwd, err := os.Getwd()
-	if err == nil {
-		params["Pwd"] = pwd
-	}
-
-	params["Backtrace"] = stacktrace(3)
-
-	post(params)
-
-	return nil
-}
-
-func Notify(e error) error {
-	once.Do(initChannel)
-
-	if ApiKey == "" {
-		return apiKeyMissing
-	}
-
-	params := map[string]interface{}{
+	params = map[string]interface{}{
 		"Class":     reflect.TypeOf(e).String(),
 		"Error":     e,
 		"ApiKey":    ApiKey,
@@ -164,20 +129,40 @@ func Notify(e error) error {
 	}
 
 	pwd, err := os.Getwd()
-
 	if err == nil {
 		params["Pwd"] = pwd
 	}
 
 	hostname, err := os.Hostname()
-
 	if err == nil {
 		params["Hostname"] = hostname
 	}
 
+	return
+}
+
+func Error(e error, request *http.Request) error {
+	if ApiKey == "" {
+		return apiKeyMissing
+	}
+
+	params := makeParams(e)
+	params["Request"] = request
+	params["Backtrace"] = stacktrace(3)
+
 	post(params)
 	return nil
+}
 
+func Notify(e error) error {
+	if ApiKey == "" {
+		return apiKeyMissing
+	}
+
+	params := makeParams(e)
+
+	post(params)
+	return nil
 }
 
 func CapturePanic(r *http.Request) {
@@ -195,6 +180,7 @@ func CapturePanic(r *http.Request) {
 	}
 }
 
+// current schema: http://airbrake.io/airbrake_2_4.xsd
 const source = `<?xml version="1.0" encoding="UTF-8"?>
 <notice version="2.0">
   <api-key>{{ .ApiKey }}</api-key>
