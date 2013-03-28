@@ -14,9 +14,11 @@ import (
 )
 
 var (
-	ApiKey   = ""
-	Endpoint = "https://api.airbrake.io/notifier_api/v2/notices"
-	Verbose  = false
+	ApiKey      = ""
+	Hostname    = ""
+	ProjectRoot = ""
+	Endpoint    = "https://api.airbrake.io/notifier_api/v2/notices"
+	Verbose     = false
 
 	badResponse   = errors.New("Bad response")
 	apiKeyMissing = errors.New("Please set the airbrake.ApiKey before doing calls")
@@ -25,6 +27,18 @@ var (
 	dot           = []byte(".")
 	tmpl          = template.Must(template.New("error").Parse(source))
 )
+
+func init() {
+	hostname, err := os.Hostname()
+	if err == nil {
+		Hostname = hostname
+	}
+
+	pwd, err := os.Getwd()
+	if err == nil {
+		ProjectRoot = pwd
+	}
+}
 
 type Line struct {
 	Function string
@@ -128,15 +142,8 @@ func makeParams(e error) (params map[string]interface{}) {
 		params["Class"] = "Panic"
 	}
 
-	pwd, err := os.Getwd()
-	if err == nil {
-		params["Pwd"] = pwd
-	}
-
-	hostname, err := os.Hostname()
-	if err == nil {
-		params["Hostname"] = hostname
-	}
+	params["Hostname"] = Hostname
+	params["ProjectRoot"] = ProjectRoot
 
 	return
 }
@@ -206,7 +213,7 @@ const source = `<?xml version="1.0" encoding="UTF-8"?>
   </request>
   {{ end }}
   <server-environment>
-    <project-root>{{ html .Pwd }}</project-root>
+    <project-root>{{ html .ProjectRoot }}</project-root>
     <environment-name>development</environment-name>
     <hostname>{{ html .Hostname }}</hostname>
   </server-environment>
