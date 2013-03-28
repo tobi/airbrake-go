@@ -41,21 +41,21 @@ func init() {
 	}
 }
 
-type Line struct {
+type line struct {
 	Function string
 	File     string
 	Line     int
 }
 
 // return backtrace, skipping some lines
-func backtrace(skip int) (lines []Line) {
+func backtrace(skip int) (lines []line) {
 	for i := skip; ; i++ {
-		pc, file, line, ok := runtime.Caller(i)
+		pc, file, l, ok := runtime.Caller(i)
 		if !ok {
 			break
 		}
 
-		item := Line{function(pc), string(file), line}
+		item := line{function(pc), string(file), l}
 
 		// ignore panic method
 		if item.Function != "panic" {
