@@ -47,8 +47,8 @@ type Line struct {
 	Line     int
 }
 
-// stack implements Stack, skipping N frames
-func stacktrace(skip int) (lines []Line) {
+// return backtrace, skipping some lines
+func backtrace(skip int) (lines []Line) {
 	for i := skip; ; i++ {
 		pc, file, line, ok := runtime.Caller(i)
 		if !ok {
@@ -126,7 +126,6 @@ func post(params map[string]interface{}) {
 	if Verbose {
 		log.Printf("Airbreak post: %s status code: %d", params["Error"], response.StatusCode)
 	}
-
 }
 
 func makeParams(e error) (params map[string]interface{}) {
@@ -157,7 +156,7 @@ func Error(e error, request *http.Request) error {
 
 	params := makeParams(e)
 	params["Request"] = request
-	params["Backtrace"] = stacktrace(3)
+	params["Backtrace"] = backtrace(2)
 
 	post(params)
 	return nil
@@ -196,15 +195,14 @@ const source = `<?xml version="1.0" encoding="UTF-8"?>
   <notifier>
     <name>Airbrake Golang</name>
     <version>0.0.1</version>
-    <url>http://airbrake.io</url>
+    <url>https://github.com/tobi/airbrake-go</url>
   </notifier>
+
   <error>
     <class>{{ html .Class }}</class>
     <message>{{ with .ErrorName }}{{html .}}{{ end }}</message>
-    <backtrace>
-      {{ range .Backtrace }}
-      <line method="{{ html .Function}}" file="{{ html .File}}" number="{{.Line}}"/>
-      {{ end }}
+    <backtrace>{{ range .Backtrace }}
+      <line method="{{ html .Function}}" file="{{ html .File}}" number="{{.Line}}"/>{{ end }}
     </backtrace>
   </error>
   {{ with .Request }}
