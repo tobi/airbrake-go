@@ -175,6 +175,8 @@ func Notify(e error) error {
             params["Hostname"] = hostname
     }
 
+	params["Backtrace"] = stacktrace(3)
+        
         post(params)
         return nil  
     
