@@ -14,9 +14,10 @@ import (
 )
 
 var (
-	ApiKey   = ""
-	Endpoint = "https://api.airbrake.io/notifier_api/v2/notices"
-	Verbose  = false
+	ApiKey      = ""
+	Endpoint    = "https://api.airbrake.io/notifier_api/v2/notices"
+	Environment = "development"
+	Verbose     = false
 
 	badResponse   = errors.New("Bad response")
 	apiKeyMissing = errors.New("Please set the airbrake.ApiKey before doing calls")
@@ -122,11 +123,12 @@ func Error(e error, request *http.Request) error {
 	}
 
 	params := map[string]interface{}{
-		"Class":     reflect.TypeOf(e).String(),
-		"Error":     e,
-		"ApiKey":    ApiKey,
-		"ErrorName": e.Error(),
-		"Request":   request,
+		"Class":       reflect.TypeOf(e).String(),
+		"Error":       e,
+		"ApiKey":      ApiKey,
+		"ErrorName":   e.Error(),
+		"Environment": Environment,
+		"Request":     request,
 	}
 
 	if params["Class"] == "" {
@@ -140,61 +142,62 @@ func Error(e error, request *http.Request) error {
 
 	params["Backtrace"] = stacktrace(3)
 
-    post(params)
+	post(params)
 
-    return nil
+	return nil
 }
 
 func Notify(e error) error {
-    once.Do(initChannel)
-    
-    if ApiKey == "" {
-        return apiKeyMissing
-    }
-    
-    params := map[string]interface{}{
-                "Class":     reflect.TypeOf(e).String(),
-                "Error":     e,
-                "ApiKey":    ApiKey,
-                "ErrorName": e.Error(),
-        }
+	once.Do(initChannel)
 
-        if params["Class"] == "" {
-            params["Class"] = "Panic"
-        }
-        
-    pwd, err := os.Getwd()
-        
-    if err == nil {
-            params["Pwd"] = pwd                                             
-        }
-    
-    hostname, err := os.Hostname()
+	if ApiKey == "" {
+		return apiKeyMissing
+	}
 
-    if err == nil {
-            params["Hostname"] = hostname
-    }
+	params := map[string]interface{}{
+		"Class":       reflect.TypeOf(e).String(),
+		"Error":       e,
+		"ApiKey":      ApiKey,
+		"ErrorName":   e.Error(),
+		"Environment": Environment,
+	}
+
+	if params["Class"] == "" {
+		params["Class"] = "Panic"
+	}
+
+	pwd, err := os.Getwd()
+
+	if err == nil {
+		params["Pwd"] = pwd
+	}
+
+	hostname, err := os.Hostname()
+
+	if err == nil {
+		params["Hostname"] = hostname
+	}
 
 	params["Backtrace"] = stacktrace(3)
-        
-        post(params)
-        return nil  
-    
+
+	post(params)
+	return nil
+
 }
 
 func CapturePanic(r *http.Request) {
-    if rec := recover(); rec != nil {
+	if rec := recover(); rec != nil {
 
-        if err, ok := rec.(error); ok {
-            log.Printf("Recording err %s", err)
-            Error(err, r)
-        } else if err, ok := rec.(string); ok {
-            log.Printf("Recording string %s", err)
-            Error(errors.New(err), r)
-        }
+		if err, ok := rec.(error); ok {
+			log.Printf("Recording err %s", err)
+			Error(err, r)
+		} else if err, ok := rec.(string); ok {
+			log.Printf("Recording string %s", err)
+			Error(errors.New(err), r)
+		}
 
-        panic(rec)
-    }
+		panic(rec)
+	}
 }
 
 const source = `<?xml version="1.0" encoding="UTF-8"?>
@@ -223,7 +226,7 @@ const source = `<?xml version="1.0" encoding="UTF-8"?>
   {{ end }}  
   <server-environment>
     <project-root>{{ html .Pwd }}</project-root>   
-    <environment-name>development</environment-name>
+    <environment-name>{{ .Environment }}</environment-name>
     <hostname>{{ html .Hostname }}</hostname>
   </server-environment>
 </notice>`
