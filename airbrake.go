@@ -88,15 +88,19 @@ func post(params map[string]interface{}) {
 	buffer := bytes.NewBufferString("")
 
 	if err := tmpl.Execute(buffer, params); err != nil {
-		log.Printf("Airbreak error: %s", err)
+		log.Printf("Airbrake error: %s", err)
 		return
 	}
 
 	if Verbose {
-		log.Printf("Airbreak payload for endpoint %s: %s", Endpoint, buffer)
+		log.Printf("Airbrake payload for endpoint %s: %s", Endpoint, buffer)
 	}
 
 	response, err := http.Post(Endpoint, "text/xml", buffer)
+	if err != nil {
+		log.Printf("Airbrake error: %s", err)
+		return
+	}
 
 	if Verbose {
 		body, _ := ioutil.ReadAll(response.Body)
@@ -104,13 +108,8 @@ func post(params map[string]interface{}) {
 	}
 	response.Body.Close()
 
-	if err != nil {
-		log.Printf("Airbreak error: %s", err)
-		return
-	}
-
 	if Verbose {
-		log.Printf("Airbreak post: %s status code: %d", params["Error"], response.StatusCode)
+		log.Printf("Airbrake post: %s status code: %d", params["Error"], response.StatusCode)
 	}
 
 }
