@@ -21,7 +21,7 @@ func TestError(t *testing.T) {
 		t.Error(err)
 	}
 
-	time.Sleep(1e9)
+	time.Sleep(time.Second)
 }
 
 func TestRequest(t *testing.T) {
@@ -37,19 +37,20 @@ func TestRequest(t *testing.T) {
 		t.Error(err)
 	}
 
-	time.Sleep(1e9)
+	time.Sleep(time.Second)
 }
 
 func TestNotify(t *testing.T) {
 	Verbose = true
 	ApiKey = API_KEY
 	Endpoint = "https://api.airbrake.io/notifier_api/v2/notices"
-	
+
 	err := Notify(errors.New("Test Error"))
-	
+
 	if err != nil {
 		t.Error(err)
 	}
 
-	time.Sleep(1e9)
+	time.Sleep(time.Second)
 }
+
