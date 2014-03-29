@@ -41,6 +41,7 @@ func TestError(t *testing.T) {
 
 func TestRequest(t *testing.T) {
 	request, _ := http.NewRequest("GET", "/some/path?a=1", nil)
+	request.Header.Set("Content-Type", "application/json")
 
 	err := Error(errors.New("Test Request"), request)
 	if err != nil {

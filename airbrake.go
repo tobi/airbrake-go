@@ -193,10 +193,8 @@ const source = `<?xml version="1.0" encoding="UTF-8"?>
     <url>{{ html .URL }}</url>
     <component/>
     <action/>
-    <cgi-data>
-    {{  range $name, $value := .Header  }}
-      <var key="{{ $name }}">{{ $value }}</var>
-    {{ end }}
+    <cgi-data>{{ range $name, $values := .Header }}{{ range $value := $values }}
+      <var key="{{ $name }}">{{ $value }}</var>{{ end }}{{ end }}
     </cgi-data>
   </request>
   {{ end }}
