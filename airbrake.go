@@ -139,6 +139,11 @@ func Error(e error, request *http.Request) error {
 		params["Pwd"] = pwd
 	}
 
+	hostname, err := os.Hostname()
+	if err == nil {
+		params["Hostname"] = hostname
+	}
+
 	params["Backtrace"] = stacktrace(3)
 
 	post(params)
@@ -166,13 +171,11 @@ func Notify(e error) error {
 	}
 
 	pwd, err := os.Getwd()
-
 	if err == nil {
 		params["Pwd"] = pwd
 	}
 
 	hostname, err := os.Hostname()
-
 	if err == nil {
 		params["Hostname"] = hostname
 	}
