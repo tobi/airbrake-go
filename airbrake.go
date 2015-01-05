@@ -9,7 +9,6 @@ import (
 	"os"
 	"reflect"
 	"runtime"
-	"sync"
 	"text/template"
 )
 
@@ -51,9 +50,6 @@ func stacktrace(skip int) (lines []Line) {
 	return
 }
 
-var channel chan map[string]interface{}
-var once sync.Once
-
 // function returns, if possible, the name of the function containing the PC.
 func function(pc uintptr) []byte {
 	fn := runtime.FuncForPC(pc)
@@ -72,16 +68,6 @@ func function(pc uintptr) []byte {
 	}
 	name = bytes.Replace(name, centerDot, dot, -1)
 	return name
-}
-
-func initChannel() {
-	channel = make(chan map[string]interface{}, 100)
-
-	go func() {
-		for params := range channel {
-			post(params)
-		}
-	}()
 }
 
 func post(params map[string]interface{}) {
@@ -115,8 +101,6 @@ func post(params map[string]interface{}) {
 }
 
 func Error(e error, request *http.Request) error {
-	once.Do(initChannel)
-
 	if ApiKey == "" {
 		return apiKeyMissing
 	}
@@ -152,8 +136,6 @@ func Error(e error, request *http.Request) error {
 }
 
 func Notify(e error) error {
-	once.Do(initChannel)
-
 	if ApiKey == "" {
 		return apiKeyMissing
 	}
@@ -225,9 +207,9 @@ const source = `<?xml version="1.0" encoding="UTF-8"?>
     <component/>
     <action/>
   </request>
-  {{ end }}  
+  {{ end }}
   <server-environment>
-    <project-root>{{ html .Pwd }}</project-root>   
+    <project-root>{{ html .Pwd }}</project-root>
     <environment-name>{{ .Environment }}</environment-name>
     <hostname>{{ html .Hostname }}</hostname>
   </server-environment>
