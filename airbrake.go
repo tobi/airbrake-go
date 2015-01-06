@@ -121,33 +121,12 @@ func Error(e error, request *http.Request) error {
 		return apiKeyMissing
 	}
 
-	params := map[string]interface{}{
-		"Class":       reflect.TypeOf(e).String(),
-		"Error":       e,
-		"ApiKey":      ApiKey,
-		"ErrorName":   e.Error(),
-		"Environment": Environment,
-		"Request":     request,
-	}
-
-	if params["Class"] == "" {
-		params["Class"] = "Panic"
-	}
-
-	pwd, err := os.Getwd()
-	if err == nil {
-		params["Pwd"] = pwd
-	}
-
-	hostname, err := os.Hostname()
-	if err == nil {
-		params["Hostname"] = hostname
-	}
-
-	params["Backtrace"] = stacktrace(3)
+	params := params(e)
+	params["Request"] = request
+	// Make sure parameters are parsed, otherwise they won't be rendered.
+	request.ParseForm()
 
 	post(params)
-
 	return nil
 }
 
@@ -158,6 +137,12 @@ func Notify(e error) error {
 		return apiKeyMissing
 	}
 
+	post(params(e))
+	return nil
+
+}
+
+func params(e error) map[string]interface{} {
 	params := map[string]interface{}{
 		"Class":       reflect.TypeOf(e).String(),
 		"Error":       e,
@@ -181,10 +166,7 @@ func Notify(e error) error {
 	}
 
 	params["Backtrace"] = stacktrace(3)
-
-	post(params)
-	return nil
-
+	return params
 }
 
 func CapturePanic(r *http.Request) {
@@ -219,15 +201,18 @@ const source = `<?xml version="1.0" encoding="UTF-8"?>
       {{ end }}
     </backtrace>
   </error>
-  {{ with .Request }}
+  {{ with $r := .Request }}
   <request>
     <url>{{ html .URL }}</url>
     <component/>
     <action/>
+    <params>{{ range $key, $value := .Form }}
+      <var key={{ $key }}>{{ $r.FormValue $key }}</var>{{ end }}
+    </params>
   </request>
-  {{ end }}  
+  {{ end }}
   <server-environment>
-    <project-root>{{ html .Pwd }}</project-root>   
+    <project-root>{{ html .Pwd }}</project-root>
     <environment-name>{{ .Environment }}</environment-name>
     <hostname>{{ html .Hostname }}</hostname>
   </server-environment>
