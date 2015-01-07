@@ -19,6 +19,10 @@ var (
 	Environment = "development"
 	Verbose     = false
 
+	// PrettyParams allows including request query/form parameters on the Environment tab
+	// which is more readable than the raw text of the Parameters tab (in Errbit)
+	PrettyParams = false
+
 	badResponse   = errors.New("Bad response")
 	apiKeyMissing = errors.New("Please set the airbrake.ApiKey before doing calls")
 	dunno         = []byte("???")
@@ -84,12 +88,12 @@ func initChannel() {
 	}()
 }
 
-func post(params map[string]interface{}) {
+func post(params map[string]interface{}) error {
 	buffer := bytes.NewBufferString("")
 
 	if err := tmpl.Execute(buffer, params); err != nil {
 		log.Printf("Airbrake error: %s", err)
-		return
+		return err
 	}
 
 	if Verbose {
@@ -99,7 +103,7 @@ func post(params map[string]interface{}) {
 	response, err := http.Post(Endpoint, "text/xml", buffer)
 	if err != nil {
 		log.Printf("Airbrake error: %s", err)
-		return
+		return err
 	}
 
 	if Verbose {
@@ -112,6 +116,7 @@ func post(params map[string]interface{}) {
 		log.Printf("Airbrake post: %s status code: %d", params["Error"], response.StatusCode)
 	}
 
+	return nil
 }
 
 func Error(e error, request *http.Request) error {
@@ -121,13 +126,7 @@ func Error(e error, request *http.Request) error {
 		return apiKeyMissing
 	}
 
-	params := params(e)
-	params["Request"] = request
-	// Make sure parameters are parsed, otherwise they won't be rendered.
-	request.ParseForm()
-
-	post(params)
-	return nil
+	return post(params(e, request))
 }
 
 func Notify(e error) error {
@@ -137,12 +136,10 @@ func Notify(e error) error {
 		return apiKeyMissing
 	}
 
-	post(params(e))
-	return nil
-
+	return post(params(e, nil))
 }
 
-func params(e error) map[string]interface{} {
+func params(e error, request *http.Request) map[string]interface{} {
 	params := map[string]interface{}{
 		"Class":       reflect.TypeOf(e).String(),
 		"Error":       e,
@@ -166,6 +163,24 @@ func params(e error) map[string]interface{} {
 	}
 
 	params["Backtrace"] = stacktrace(3)
+
+	if request == nil || request.ParseForm() != nil {
+		return params
+	}
+
+	params["Request"] = request
+
+	if PrettyParams {
+		qps := make(map[string]interface{})
+		for k, v := range request.Form {
+			if len(v) > 0 && len(v[0]) > 0 {
+				qps[k] = v[0]
+			}
+		}
+		if len(qps) > 0 {
+			params["PrettyParams"] = qps
+		}
+	}
 	return params
 }
 
@@ -194,23 +209,25 @@ const source = `<?xml version="1.0" encoding="UTF-8"?>
   </notifier>
   <error>
     <class>{{ html .Class }}</class>
-    <message>{{ with .ErrorName }}{{html .}}{{ end }}</message>
-    <backtrace>
-      {{ range .Backtrace }}
-      <line method="{{ html .Function}}" file="{{ html .File}}" number="{{.Line}}"/>
-      {{ end }}
+    <message>{{ html .ErrorName }}</message>
+    <backtrace>{{ range .Backtrace }}
+      <line method="{{ html .Function}}" file="{{ html .File}}" number="{{.Line}}"/>{{ end }}
     </backtrace>
-  </error>
-  {{ with $r := .Request }}
+  </error>{{ with .Request }}
   <request>
-    <url>{{ html .URL }}</url>
+    <url>{{if .RequestURI}}{{html .RequestURI}}{{else}}{{html .URL}}{{end}}</url>
     <component/>
-    <action/>
-    <params>{{ range $key, $value := .Form }}
-      <var key={{ $key }}>{{ $r.FormValue $key }}</var>{{ end }}
-    </params>
-  </request>
-  {{ end }}
+    <action/>{{ if not .ParseForm }}
+    <params>{{ range $key, $value := .Form }}{{ if and (len $value) (len (index $value 0)) }}
+      <var key="{{ $key }}">{{ index $value 0 }}</var>{{ end }}{{end}}
+    </params>{{ end }}
+    <cgi-data>{{ range $key, $value := .Header }}{{ if and (len $value) (len (index $value 0)) }}
+      <var key="{{ $key }}">{{ index $value 0 }}</var>{{ end }}{{end}}
+      <var key="METHOD">{{ .Method }}</var>
+      <var key="PROTOCOL">{{ .Proto }}</var>{{ range $key, $value := $.PrettyParams }}
+      <var key="?{{ $key }}">{{ $value }}</var>{{ end }}
+    </cgi-data>
+  </request>{{ end }}
   <server-environment>
     <project-root>{{ html .Pwd }}</project-root>
     <environment-name>{{ .Environment }}</environment-name>

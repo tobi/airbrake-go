@@ -58,11 +58,15 @@ func TestNotify(t *testing.T) {
 // Make sure we match https://help.airbrake.io/kb/api-2/notifier-api-version-23
 func TestTemplateV2(t *testing.T) {
 	var p map[string]interface{}
+	request, _ := http.NewRequest("GET", "/query?t=xxx&q=SHOW+x+BY+y+FROM+z&timezone=", nil)
+	request.Header.Set("Host", "Zulu")
+	PrettyParams = true
+	defer func() { PrettyParams = false }()
 
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
-				p = params(r.(error))
+				p = params(r.(error), request)
 			}
 		}()
 		panic(errors.New("Boom!"))
@@ -75,18 +79,8 @@ func TestTemplateV2(t *testing.T) {
 	if len(p["Backtrace"].([]Line)) < 3 {
 		t.Fail()
 	}
-
 	// It's messy to generically test rendered backtrace.
 	delete(p, "Backtrace")
-
-	// Add request
-	if r, err := http.NewRequest("GET", "/query?t=xxx&q=SHOW+x+BY+y+FROM+z", nil); err != nil {
-		t.Fatal(err)
-	} else {
-		// Make sure parameters are parsed, otherwise they won't be rendered.
-		r.ParseForm()
-		p["Request"] = r
-	}
 
 	var b bytes.Buffer
 	if err := tmpl.Execute(&b, p); err != nil {
@@ -103,13 +97,20 @@ func TestTemplateV2(t *testing.T) {
 
 	chunk = regexp.MustCompile(`(?s)<request>.*</request>`).FindString(b.String())
 	if chunk != `<request>
-    <url>/query?t=xxx&amp;q=SHOW+x+BY+y+FROM+z</url>
+    <url>/query?t=xxx&amp;q=SHOW+x+BY+y+FROM+z&amp;timezone=</url>
     <component/>
     <action/>
     <params>
-      <var key=q>SHOW x BY y FROM z</var>
-      <var key=t>xxx</var>
+      <var key="q">SHOW x BY y FROM z</var>
+      <var key="t">xxx</var>
     </params>
+    <cgi-data>
+      <var key="Host">Zulu</var>
+      <var key="METHOD">GET</var>
+      <var key="PROTOCOL">HTTP/1.1</var>
+      <var key="?q">SHOW x BY y FROM z</var>
+      <var key="?t">xxx</var>
+    </cgi-data>
   </request>` {
 		t.Fatal(chunk)
 	}
