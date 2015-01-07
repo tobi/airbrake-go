@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"regexp"
 	"runtime"
 	"sync"
 	"text/template"
@@ -24,6 +25,7 @@ var (
 	// The param keys will be rendered as "?<param>" so they will sort together at the top of the tab.
 	PrettyParams = false
 
+	sensitive     = regexp.MustCompile(`password|token|secret|key`)
 	badResponse   = errors.New("Bad response")
 	apiKeyMissing = errors.New("Please set the airbrake.ApiKey before doing calls")
 	dunno         = []byte("???")
@@ -169,20 +171,47 @@ func params(e error, request *http.Request) map[string]interface{} {
 		return params
 	}
 
-	params["Request"] = request
+	// Compile relevant request parameters into a map.
+	req := make(map[string]interface{})
+	params["Request"] = req
+	req["Component"] = ""
+	req["Action"] = ""
+	// Nested http Muxes muck with the URL, prefer RequestURI.
+	if request.RequestURI != "" {
+		req["URL"] = request.RequestURI
+	} else {
+		req["URL"] = request.URL
+	}
 
-	if PrettyParams {
-		qps := make(map[string]interface{})
-		for k, v := range request.Form {
-			if len(v) > 0 && len(v[0]) > 0 {
-				qps[k] = v[0]
-			}
-		}
-		if len(qps) > 0 {
-			params["PrettyParams"] = qps
+	// Compile header parameters.
+	header := make(map[string]string)
+	req["Header"] = header
+	header["Method"] = request.Method
+	header["Protocol"] = request.Proto
+	for k, v := range request.Header {
+		if !omit(k, v) {
+			header[k] = v[0]
 		}
 	}
+
+	// Compile query/form parameters.
+	form := make(map[string]string)
+	req["Form"] = form
+	for k, v := range request.Form {
+		if !omit(k, v) {
+			form[k] = v[0]
+			if PrettyParams {
+				header["?"+k] = v[0]
+			}
+		}
+	}
+
 	return params
+}
+
+// omit checks the key, values for emptiness or sensitivity.
+func omit(key string, values []string) bool {
+	return len(key) == 0 || len(values) == 0 || len(values[0]) == 0 || sensitive.FindString(key) != ""
 }
 
 func CapturePanic(r *http.Request) {
@@ -216,17 +245,14 @@ const source = `<?xml version="1.0" encoding="UTF-8"?>
     </backtrace>
   </error>{{ with .Request }}
   <request>
-    <url>{{if .RequestURI}}{{html .RequestURI}}{{else}}{{html .URL}}{{end}}</url>
-    <component/>
-    <action/>{{ if not .ParseForm }}
-    <params>{{ range $key, $value := .Form }}{{ if and (len $value) (len (index $value 0)) }}
-      <var key="{{ $key }}">{{ index $value 0 }}</var>{{ end }}{{end}}
-    </params>{{ end }}
-    <cgi-data>{{ range $key, $value := .Header }}{{ if and (len $value) (len (index $value 0)) }}
-      <var key="{{ $key }}">{{ index $value 0 }}</var>{{ end }}{{end}}
-      <var key="METHOD">{{ .Method }}</var>
-      <var key="PROTOCOL">{{ .Proto }}</var>{{ range $key, $value := $.PrettyParams }}
-      <var key="?{{ $key }}">{{ $value }}</var>{{ end }}
+    <url>{{html .URL}}</url>
+    <component>{{ .Component }}</component>
+    <action>{{ .Action }}</action>
+    <params>{{ range $key, $value := .Form }}
+      <var key="{{ $key }}">{{ $value }}</var>{{ end }}
+    </params>
+    <cgi-data>{{ range $key, $value := .Header }}
+      <var key="{{ $key }}">{{ $value }}</var>{{ end }}
     </cgi-data>
   </request>{{ end }}
   <server-environment>

@@ -58,8 +58,9 @@ func TestNotify(t *testing.T) {
 // Make sure we match https://help.airbrake.io/kb/api-2/notifier-api-version-23
 func TestTemplateV2(t *testing.T) {
 	var p map[string]interface{}
-	request, _ := http.NewRequest("GET", "/query?t=xxx&q=SHOW+x+BY+y+FROM+z&timezone=", nil)
+	request, _ := http.NewRequest("GET", "/query?t=xxx&q=SHOW+x+BY+y+FROM+z&key=sesame&timezone=", nil)
 	request.Header.Set("Host", "Zulu")
+	request.Header.Set("Keep_Secret", "Sesame")
 	PrettyParams = true
 	defer func() { PrettyParams = false }()
 
@@ -104,19 +105,19 @@ func TestTemplateV2(t *testing.T) {
 	// Validate the <request> node.
 	chunk = regexp.MustCompile(`(?s)<request>.*</request>`).FindString(b.String())
 	if chunk != `<request>
-    <url>/query?t=xxx&amp;q=SHOW+x+BY+y+FROM+z&amp;timezone=</url>
-    <component/>
-    <action/>
+    <url>/query?t=xxx&amp;q=SHOW+x+BY+y+FROM+z&amp;key=sesame&amp;timezone=</url>
+    <component></component>
+    <action></action>
     <params>
       <var key="q">SHOW x BY y FROM z</var>
       <var key="t">xxx</var>
     </params>
     <cgi-data>
-      <var key="Host">Zulu</var>
-      <var key="METHOD">GET</var>
-      <var key="PROTOCOL">HTTP/1.1</var>
       <var key="?q">SHOW x BY y FROM z</var>
       <var key="?t">xxx</var>
+      <var key="Host">Zulu</var>
+      <var key="Method">GET</var>
+      <var key="Protocol">HTTP/1.1</var>
     </cgi-data>
   </request>` {
 		t.Fatal(chunk)
