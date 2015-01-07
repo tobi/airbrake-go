@@ -20,7 +20,8 @@ var (
 	Verbose     = false
 
 	// PrettyParams allows including request query/form parameters on the Environment tab
-	// which is more readable than the raw text of the Parameters tab (in Errbit)
+	// which is more readable than the raw text of the Parameters tab (in Errbit).
+	// The param keys will be rendered as "?<param>" so they will sort together at the top of the tab.
 	PrettyParams = false
 
 	badResponse   = errors.New("Bad response")

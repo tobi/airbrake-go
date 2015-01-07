@@ -63,6 +63,7 @@ func TestTemplateV2(t *testing.T) {
 	PrettyParams = true
 	defer func() { PrettyParams = false }()
 
+	// Trigger and recover a panic, so that we have something to render.
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -72,21 +73,26 @@ func TestTemplateV2(t *testing.T) {
 		panic(errors.New("Boom!"))
 	}()
 
+	// Did that work?
 	if p == nil {
 		t.Fail()
 	}
 
+	// Crude backtrace check.
 	if len(p["Backtrace"].([]Line)) < 3 {
 		t.Fail()
 	}
-	// It's messy to generically test rendered backtrace.
+
+	// It's messy to generically test rendered backtrace, drop it.
 	delete(p, "Backtrace")
 
+	// Render the params.
 	var b bytes.Buffer
 	if err := tmpl.Execute(&b, p); err != nil {
 		t.Fatalf("Template error: %s", err)
 	}
 
+	// Validate the <error> node.
 	chunk := regexp.MustCompile(`(?s)<error>.*<backtrace>`).FindString(b.String())
 	if chunk != `<error>
     <class>*errors.errorString</class>
@@ -95,6 +101,7 @@ func TestTemplateV2(t *testing.T) {
 		t.Fatal(chunk)
 	}
 
+	// Validate the <request> node.
 	chunk = regexp.MustCompile(`(?s)<request>.*</request>`).FindString(b.String())
 	if chunk != `<request>
     <url>/query?t=xxx&amp;q=SHOW+x+BY+y+FROM+z&amp;timezone=</url>
