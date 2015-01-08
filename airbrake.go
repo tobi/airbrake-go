@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"regexp"
 	"runtime"
 	"sync"
 	"text/template"
@@ -19,6 +20,12 @@ var (
 	Environment = "development"
 	Verbose     = false
 
+	// PrettyParams allows including request query/form parameters on the Environment tab
+	// which is more readable than the raw text of the Parameters tab (in Errbit).
+	// The param keys will be rendered as "?<param>" so they will sort together at the top of the tab.
+	PrettyParams = false
+
+	sensitive     = regexp.MustCompile(`password|token|secret|key`)
 	badResponse   = errors.New("Bad response")
 	apiKeyMissing = errors.New("Please set the airbrake.ApiKey before doing calls")
 	dunno         = []byte("???")
@@ -84,12 +91,12 @@ func initChannel() {
 	}()
 }
 
-func post(params map[string]interface{}) {
+func post(params map[string]interface{}) error {
 	buffer := bytes.NewBufferString("")
 
 	if err := tmpl.Execute(buffer, params); err != nil {
 		log.Printf("Airbrake error: %s", err)
-		return
+		return err
 	}
 
 	if Verbose {
@@ -99,7 +106,7 @@ func post(params map[string]interface{}) {
 	response, err := http.Post(Endpoint, "text/xml", buffer)
 	if err != nil {
 		log.Printf("Airbrake error: %s", err)
-		return
+		return err
 	}
 
 	if Verbose {
@@ -112,6 +119,7 @@ func post(params map[string]interface{}) {
 		log.Printf("Airbrake post: %s status code: %d", params["Error"], response.StatusCode)
 	}
 
+	return nil
 }
 
 func Error(e error, request *http.Request) error {
@@ -121,34 +129,7 @@ func Error(e error, request *http.Request) error {
 		return apiKeyMissing
 	}
 
-	params := map[string]interface{}{
-		"Class":       reflect.TypeOf(e).String(),
-		"Error":       e,
-		"ApiKey":      ApiKey,
-		"ErrorName":   e.Error(),
-		"Environment": Environment,
-		"Request":     request,
-	}
-
-	if params["Class"] == "" {
-		params["Class"] = "Panic"
-	}
-
-	pwd, err := os.Getwd()
-	if err == nil {
-		params["Pwd"] = pwd
-	}
-
-	hostname, err := os.Hostname()
-	if err == nil {
-		params["Hostname"] = hostname
-	}
-
-	params["Backtrace"] = stacktrace(3)
-
-	post(params)
-
-	return nil
+	return post(params(e, request))
 }
 
 func Notify(e error) error {
@@ -158,6 +139,10 @@ func Notify(e error) error {
 		return apiKeyMissing
 	}
 
+	return post(params(e, nil))
+}
+
+func params(e error, request *http.Request) map[string]interface{} {
 	params := map[string]interface{}{
 		"Class":       reflect.TypeOf(e).String(),
 		"Error":       e,
@@ -182,9 +167,51 @@ func Notify(e error) error {
 
 	params["Backtrace"] = stacktrace(3)
 
-	post(params)
-	return nil
+	if request == nil || request.ParseForm() != nil {
+		return params
+	}
 
+	// Compile relevant request parameters into a map.
+	req := make(map[string]interface{})
+	params["Request"] = req
+	req["Component"] = ""
+	req["Action"] = ""
+	// Nested http Muxes muck with the URL, prefer RequestURI.
+	if request.RequestURI != "" {
+		req["URL"] = request.RequestURI
+	} else {
+		req["URL"] = request.URL
+	}
+
+	// Compile header parameters.
+	header := make(map[string]string)
+	req["Header"] = header
+	header["Method"] = request.Method
+	header["Protocol"] = request.Proto
+	for k, v := range request.Header {
+		if !omit(k, v) {
+			header[k] = v[0]
+		}
+	}
+
+	// Compile query/form parameters.
+	form := make(map[string]string)
+	req["Form"] = form
+	for k, v := range request.Form {
+		if !omit(k, v) {
+			form[k] = v[0]
+			if PrettyParams {
+				header["?"+k] = v[0]
+			}
+		}
+	}
+
+	return params
+}
+
+// omit checks the key, values for emptiness or sensitivity.
+func omit(key string, values []string) bool {
+	return len(key) == 0 || len(values) == 0 || len(values[0]) == 0 || sensitive.FindString(key) != ""
 }
 
 func CapturePanic(r *http.Request) {
@@ -212,22 +239,24 @@ const source = `<?xml version="1.0" encoding="UTF-8"?>
   </notifier>
   <error>
     <class>{{ html .Class }}</class>
-    <message>{{ with .ErrorName }}{{html .}}{{ end }}</message>
-    <backtrace>
-      {{ range .Backtrace }}
-      <line method="{{ html .Function}}" file="{{ html .File}}" number="{{.Line}}"/>
-      {{ end }}
+    <message>{{ html .ErrorName }}</message>
+    <backtrace>{{ range .Backtrace }}
+      <line method="{{ html .Function}}" file="{{ html .File}}" number="{{.Line}}"/>{{ end }}
     </backtrace>
-  </error>
-  {{ with .Request }}
+  </error>{{ with .Request }}
   <request>
-    <url>{{ html .URL }}</url>
-    <component/>
-    <action/>
-  </request>
-  {{ end }}  
+    <url>{{html .URL}}</url>
+    <component>{{ .Component }}</component>
+    <action>{{ .Action }}</action>
+    <params>{{ range $key, $value := .Form }}
+      <var key="{{ $key }}">{{ $value }}</var>{{ end }}
+    </params>
+    <cgi-data>{{ range $key, $value := .Header }}
+      <var key="{{ $key }}">{{ $value }}</var>{{ end }}
+    </cgi-data>
+  </request>{{ end }}
   <server-environment>
-    <project-root>{{ html .Pwd }}</project-root>   
+    <project-root>{{ html .Pwd }}</project-root>
     <environment-name>{{ .Environment }}</environment-name>
     <hostname>{{ html .Hostname }}</hostname>
   </server-environment>
