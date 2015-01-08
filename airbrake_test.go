@@ -55,6 +55,42 @@ func TestNotify(t *testing.T) {
 	time.Sleep(1e9)
 }
 
+func TestShorten(t *testing.T) {
+	for _, sample := range []struct{ in, out string }{
+		{"net/http.func·011", "http.func.011"},
+		{"runtime.panic", "runtime.panic"},
+		{"github.com/tobi/airbrake-go.CapturePanic", "airbrake-go.CapturePanic"},
+		{"github.com/Shopify/reportifydb.(*Partition).view", "reportifydb.(*Partition).view"},
+		{"github.com/Shopify/reportifydb.*Handler.AdminQuery·fm", "reportifydb.*Handler.AdminQuery.fm"},
+	} {
+		if result := shorten(sample.in); result != sample.out {
+			t.Fatalf("expected: %s got: %s", sample.out, result)
+		}
+	}
+}
+
+func TestLocate(t *testing.T) {
+	RootPackage = "github.com/Shopify/reportifydb"
+	for _, sample := range []struct{ in, out string }{
+		{"/home/vagrant/src/go/src/github.com/Shopify/reportifydb/shopifyql/executor.go",
+			"[PROJECT_ROOT]/shopifyql/executor.go",
+		},
+		{"/home/vagrant/src/go/src/github.com/Shopify/reportifydb/handler_admin.go",
+			"[PROJECT_ROOT]/handler_admin.go",
+		},
+		{"/home/vagrant/src/go/src/github.com/tobi/airbrake-go/airbrake.go",
+			"/home/vagrant/src/go/src/github.com/tobi/airbrake-go/airbrake.go",
+		},
+		{"/usr/local/go/src/pkg/net/http/server.go",
+			"/usr/local/go/src/pkg/net/http/server.go",
+		},
+	} {
+		if result := locate(sample.in); result != sample.out {
+			t.Fatalf("expected: %s got: %s", sample.out, result)
+		}
+	}
+}
+
 // Make sure we match https://help.airbrake.io/kb/api-2/notifier-api-version-23
 func TestTemplateV2(t *testing.T) {
 	var p map[string]interface{}
@@ -115,9 +151,9 @@ func TestTemplateV2(t *testing.T) {
     <cgi-data>
       <var key="?q">SHOW x BY y FROM z</var>
       <var key="?t">xxx</var>
-      <var key="Host">Zulu</var>
-      <var key="Method">GET</var>
-      <var key="Protocol">HTTP/1.1</var>
+      <var key="HTTP_HOST">Zulu</var>
+      <var key="REQUEST_METHOD">GET</var>
+      <var key="REQUEST_PROTOCOL">HTTP/1.1</var>
     </cgi-data>
   </request>` {
 		t.Fatal(chunk)
