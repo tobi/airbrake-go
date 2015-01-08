@@ -33,6 +33,13 @@ var (
 	// This feature also requires the APP to have its Repository configured in errbit.
 	RootPackage = ""
 
+	// AppVersion determines which commit will be used for backtrace hyperlinks.
+	// If unset, errbit defaults to `master`. For github it should be a branch name
+	// or a commit hash.
+	// One way to record the corresponding commit hash in a compiled binary
+	// is to use the -X linker flag. (see https://golang.org/cmd/ld)
+	AppVersion = ""
+
 	sensitive     = regexp.MustCompile(`password|token|secret|key`)
 	badResponse   = errors.New("Bad response")
 	apiKeyMissing = errors.New("Please set the airbrake.ApiKey before doing calls")
@@ -207,12 +214,19 @@ func params(e error, request *http.Request) map[string]interface{} {
 	// Compile header parameters.
 	header := make(map[string]string)
 	req["Header"] = header
-	header["Method"] = request.Method
-	header["Protocol"] = request.Proto
+	header["REQUEST_METHOD"] = request.Method
+	header["REQUEST_PROTOCOL"] = request.Proto
 	for k, v := range request.Header {
 		if !omit(k, v) {
-			header[k] = v[0]
+			// errbit processes some entries, e.g. user agent, and expects
+			// the keys to be uppercased, underscored and prefixed with HTTP_
+			k := strings.ToUpper(strings.Replace(k, "-", "_", -1))
+			header["HTTP_"+k] = v[0]
 		}
+	}
+	// This allows errbit to hyperlink to specific commit in the app repo.
+	if AppVersion != "" {
+		header["APP_VERSION"] = AppVersion
 	}
 
 	// Compile query/form parameters.
