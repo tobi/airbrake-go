@@ -151,9 +151,9 @@ func TestTemplateV2(t *testing.T) {
     <cgi-data>
       <var key="?q">SHOW x BY y FROM z</var>
       <var key="?t">xxx</var>
-      <var key="Host">Zulu</var>
-      <var key="Method">GET</var>
-      <var key="Protocol">HTTP/1.1</var>
+      <var key="HTTP_HOST">Zulu</var>
+      <var key="REQUEST_METHOD">GET</var>
+      <var key="REQUEST_PROTOCOL">HTTP/1.1</var>
     </cgi-data>
   </request>` {
 		t.Fatal(chunk)
