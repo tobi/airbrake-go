@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"regexp"
 	"runtime"
+	"strings"
 	"sync"
 	"text/template"
 )
@@ -25,12 +26,16 @@ var (
 	// The param keys will be rendered as "?<param>" so they will sort together at the top of the tab.
 	PrettyParams = false
 
+	// RootPackage enables rendering of the backtrace with hyperlinks to the repository.
+	// If set to the name of the root package of the project, e.g. github.com/user/project,
+	// any file paths in the backtrace that contain that string will be converted
+	// to the `[PROJECT_ROOT]/...` form, which triggers the hyperlinking in errbit.
+	// This feature also requires the APP to have its Repository configured in errbit.
+	RootPackage = ""
+
 	sensitive     = regexp.MustCompile(`password|token|secret|key`)
 	badResponse   = errors.New("Bad response")
 	apiKeyMissing = errors.New("Please set the airbrake.ApiKey before doing calls")
-	dunno         = []byte("???")
-	centerDot     = []byte("·")
-	dot           = []byte(".")
 	tmpl          = template.Must(template.New("error").Parse(source))
 )
 
@@ -48,7 +53,7 @@ func stacktrace(skip int) (lines []Line) {
 			break
 		}
 
-		item := Line{string(function(pc)), string(file), line}
+		item := Line{function(pc), locate(file), line}
 
 		// ignore panic method
 		if item.Function != "panic" {
@@ -62,23 +67,39 @@ var channel chan map[string]interface{}
 var once sync.Once
 
 // function returns, if possible, the name of the function containing the PC.
-func function(pc uintptr) []byte {
+func function(pc uintptr) string {
 	fn := runtime.FuncForPC(pc)
 	if fn == nil {
-		return dunno
+		return "???"
+	} else {
+		return shorten(fn.Name())
 	}
-	name := []byte(fn.Name())
+}
+
+func shorten(name string) string {
 	// The name includes the path name to the package, which is unnecessary
 	// since the file name is already included.  Plus, it has center dots.
 	// That is, we see
 	//  runtime/debug.*T·ptrmethod
 	// and want
-	//  *T.ptrmethod
-	if period := bytes.Index(name, dot); period >= 0 {
+	//  debug.*T.ptrmethod
+	if period := strings.LastIndex(name, "/"); period >= 0 {
 		name = name[period+1:]
 	}
-	name = bytes.Replace(name, centerDot, dot, -1)
+	name = strings.Replace(name, "·", ".", -1)
 	return name
+}
+
+func locate(f string) string {
+	if RootPackage == "" {
+		return f
+	}
+	parts := strings.Split(f, RootPackage)
+	if len(parts) == 2 {
+		return "[PROJECT_ROOT]" + parts[1]
+	} else {
+		return f
+	}
 }
 
 func initChannel() {
